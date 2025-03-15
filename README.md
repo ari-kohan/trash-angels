@@ -1,50 +1,90 @@
-# Welcome to your Expo app 👋
+# Trash Angels
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A mobile app that helps communities clean up trash by allowing users to mark trash locations on a map and notify nearby users.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Interactive Map**: View and interact with a map showing trash locations that need to be picked up
+- **Add Trash Locations**: Mark locations where trash needs to be picked up
+- **Notifications**: Receive notifications about trash within a 0.5-mile radius
+- **Mark as Picked Up**: Mark trash as picked up once it's been cleaned
+- **User Profile**: View your cleanup history and manage settings
 
-   ```bash
-   npm install
-   ```
+## Tech Stack
 
-2. Start the app
+- React Native with Expo
+- TypeScript
+- Supabase for backend storage
+- React Native Maps for map functionality
+- Expo Location for location tracking
+- Expo Notifications for push notifications
 
-   ```bash
-    npx expo start
-   ```
+## Getting Started
 
-In the output, you'll find options to open the app in a
+### Prerequisites
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node.js (v14 or newer)
+- npm or yarn
+- Expo CLI
+- Supabase account
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Installation
 
-## Get a fresh project
-
-When you're ready, run:
-
+1. Clone the repository
 ```bash
-npm run reset-project
+git clone https://github.com/yourusername/trash-angels.git
+cd trash-angels
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Install dependencies
+```bash
+npm install
+```
 
-## Learn more
+3. Set up Supabase
+   - Create a new Supabase project
+   - Create a `trash_locations` table with the following schema:
+     - id (uuid, primary key)
+     - latitude (float, not null)
+     - longitude (float, not null)
+     - created_at (timestamp with time zone, not null)
+     - created_by (uuid, not null)
+     - status (text, not null) - can be 'active' or 'picked_up'
+     - description (text)
+     - image_url (text)
 
-To learn more about developing your project with Expo, look at the following resources:
+4. Update Supabase configuration
+   - Open `lib/supabase.ts`
+   - Replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_ANON_KEY` with your actual Supabase URL and anon key
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+5. Start the development server
+```bash
+npm start
+```
 
-## Join the community
+## Usage
 
-Join our community of developers creating universal apps.
+1. **View Map**: The main screen shows a map with trash locations marked as pins
+2. **Add Trash**: Tap the "+" button and then tap on the map to mark a trash location
+3. **Mark as Picked Up**: Tap on a trash pin and select "Mark as Picked Up" when you've cleaned it
+4. **Profile**: Tap the profile icon to view your cleanup history and manage settings
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Project Structure
+
+- `/app` - Main application screens
+- `/components` - Reusable UI components
+- `/context` - React context for state management
+- `/lib` - Utility functions and external service configurations
+- `/types` - TypeScript type definitions
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
