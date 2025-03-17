@@ -36,6 +36,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9324f3cf-ac4a-4523-8709-23b90045d3c1"
+      }
+    },
+    "owner": "ari_ko"
   }
 }

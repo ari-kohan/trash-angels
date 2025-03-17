@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { useAppContext } from '../context/AppContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { userLocation } = useAppContext();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const { 
+    userLocation, 
+    notificationsEnabled, 
+    toggleNotifications, 
+    notificationRadius,
+    updateNotificationRadius 
+  } = useAppContext();
+  
+  // Local state to track slider value before committing the change
+  const [sliderValue, setSliderValue] = useState(notificationRadius);
   
   // Mock data for user stats - in a real app, this would come from the database
   const userStats = {
@@ -23,9 +32,12 @@ export default function ProfileScreen() {
     { id: '4', date: '2025-02-20', location: 'Dolores Park' },
   ];
 
-  const toggleNotifications = () => {
-    setNotificationsEnabled(previousState => !previousState);
-    // In a real app, this would update the user's settings in the database
+  const handleRadiusChange = (value: number) => {
+    setSliderValue(value);
+  };
+
+  const handleRadiusChangeComplete = (value: number) => {
+    updateNotificationRadius(value);
   };
 
   return (
@@ -62,7 +74,27 @@ export default function ProfileScreen() {
         
         <View style={styles.settingItem}>
           <Text style={styles.settingLabel}>Notification Radius</Text>
-          <Text style={styles.settingValue}>0.5 miles</Text>
+          <Text style={styles.settingValue}>{sliderValue.toFixed(1)} miles</Text>
+        </View>
+        
+        <View style={styles.sliderContainer}>
+          <Slider
+            style={styles.slider}
+            minimumValue={0.1}
+            maximumValue={1.0}
+            step={0.1}
+            value={sliderValue}
+            onValueChange={handleRadiusChange}
+            onSlidingComplete={handleRadiusChangeComplete}
+            minimumTrackTintColor="#4CAF50"
+            maximumTrackTintColor="#d3d3d3"
+            thumbTintColor="#4CAF50"
+            disabled={!notificationsEnabled}
+          />
+          <View style={styles.sliderLabels}>
+            <Text style={styles.sliderLabel}>0.1</Text>
+            <Text style={styles.sliderLabel}>1.0</Text>
+          </View>
         </View>
         
         {userLocation && (
@@ -176,6 +208,23 @@ const styles = StyleSheet.create({
   },
   settingValue: {
     fontSize: 16,
+    color: '#666',
+  },
+  sliderContainer: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  slider: {
+    height: 40,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
+  },
+  sliderLabel: {
+    fontSize: 14,
     color: '#666',
   },
   historySection: {

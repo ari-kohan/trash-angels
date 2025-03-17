@@ -12,6 +12,10 @@ interface AppContextType {
   markTrashAsPickedUp: (id: string) => Promise<void>;
   loading: boolean;
   error: string | null;
+  notificationsEnabled: boolean;
+  toggleNotifications: () => void;
+  notificationRadius: number; // in miles
+  updateNotificationRadius: (radius: number) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -29,6 +33,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [trashLocations, setTrashLocations] = useState<TrashLocation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const [notificationRadius, setNotificationRadius] = useState<number>(0.2); // Default to 0.2 miles
+
+  const toggleNotifications = () => {
+    setNotificationsEnabled(prev => !prev);
+    // In a real app, this would update the user's settings in the database
+  };
+
+  const updateNotificationRadius = (radius: number) => {
+    setNotificationRadius(radius);
+    // In a real app, this would update the user's settings in the database
+  };
 
   // Setup notifications
   useEffect(() => {
@@ -87,9 +103,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               longitude,
               last_updated: new Date().toISOString(),
             } : null);
-            
-            // Check for nearby trash
-            checkForNearbyTrash(latitude, longitude);
           }
         );
 
@@ -112,7 +125,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Fetch trash locations from Supabase
   useEffect(() => {
     fetchTrashLocations();
-  }, []);
+
+    // Set up realtime subscription for new trash locations
+    const trashSubscription = supabase
+      .channel('trash_locations_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'trash_locations',
+        },
+        (payload) => {
+          console.log('New trash location added:', payload);
+          
+          // Add the new trash location to the state
+          const newTrash = payload.new as TrashLocation;
+          setTrashLocations(prev => [...prev, newTrash]);
+          
+          // Only check if we should notify if we have user location
+          if (userLocation && notificationsEnabled) {
+            // Check if the new trash is within notification radius
+            const distance = calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              newTrash.latitude,
+              newTrash.longitude
+            );
+            
+            // Convert notification radius from miles to meters
+            const radiusInMeters = notificationRadius * 1609.34;
+            
+            // If within radius, send notification
+            if (distance <= radiusInMeters) {
+              sendTrashNotification(newTrash);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // Clean up subscription on unmount
+    return () => {
+      supabase.removeChannel(trashSubscription);
+    };
+  }, [userLocation, notificationsEnabled, notificationRadius]);
 
   const fetchTrashLocations = async () => {
     try {
@@ -155,9 +212,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data && data.length > 0) {
         setTrashLocations(prev => [...prev, data[0]]);
       }
-      
-      // Notify nearby users
-      notifyNearbyUsers(latitude, longitude);
     } catch (err) {
       console.error('Error adding trash location:', err);
       setError('Failed to add trash location');
@@ -177,8 +231,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       if (error) throw error;
       
-      // Update local state after successful database update
-      setTrashLocations(prev => prev.filter(trash => trash.id !== id));
+      // Update local state to reflect the status change instead of removing the item
+      setTrashLocations(prev => 
+        prev.map(trash => 
+          trash.id === id 
+            ? { ...trash, status: 'picked_up' } 
+            : trash
+        )
+      );
+      
+      // Optionally, refetch the trash locations to ensure local state is in sync with the database
+      fetchTrashLocations();
     } catch (err) {
       console.error('Error marking trash as picked up:', err);
       setError('Failed to mark trash as picked up');
@@ -188,23 +251,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const checkForNearbyTrash = (latitude: number, longitude: number) => {
-    // Calculate distance to each trash location
-    // If within 0.5 miles (approximately 804 meters), send notification
-    const NOTIFICATION_RADIUS = 804; // meters
+    // If notifications are disabled, don't check for nearby trash
+    if (!notificationsEnabled) return;
     
-    trashLocations.forEach(trash => {
-      const distance = calculateDistance(
-        latitude,
-        longitude,
-        trash.latitude,
-        trash.longitude
-      );
-      
-      if (distance <= NOTIFICATION_RADIUS) {
-        // Send notification for nearby trash
-        sendTrashNotification(trash);
-      }
-    });
+    // We don't need to send notifications for existing trash locations when the user moves
+    // This function is now only used to update UI elements if needed
+    // Notifications for new trash are handled by the Supabase subscription
   };
 
   const calculateDistance = (
@@ -229,23 +281,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return distance; // in meters
   };
 
-  const notifyNearbyUsers = async (latitude: number, longitude: number) => {
-    // In a real app, this would be done server-side
-    // Here we're simulating it for the current user
-    
-    // Get all users within 0.5 miles
-    // For demo purposes, we'll just notify the current user
-    sendTrashNotification({
-      id: 'new-trash',
-      latitude,
-      longitude,
-      created_at: new Date().toISOString(),
-      created_by: 'current-user',
-      status: 'active',
-    });
-  };
-
   const sendTrashNotification = async (trash: TrashLocation) => {
+    // Double-check that notifications are enabled before sending
+    if (!notificationsEnabled) return;
+    
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -304,6 +343,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markTrashAsPickedUp,
         loading,
         error,
+        notificationsEnabled,
+        toggleNotifications,
+        notificationRadius,
+        updateNotificationRadius,
       }}
     >
       {children}
