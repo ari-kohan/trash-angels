@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text, Alert, Platform } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../context/AppContext';
 import { TrashLocation } from '../types';
 import { router } from 'expo-router';
+import * as Location from 'expo-location';
 
 interface TrashMapProps {
   initialRegion?: Region;
@@ -21,7 +22,48 @@ const TrashMap: React.FC<TrashMapProps> = ({
   const { userLocation, trashLocations, addTrashLocation, markTrashAsPickedUp } = useAppContext();
   const [region, setRegion] = useState<Region>(initialRegion);
   const [selectedTrash, setSelectedTrash] = useState<TrashLocation | null>(null);
+  const [locationPermissionDenied, setLocationPermissionDenied] = useState<boolean>(false);
   const mapRef = useRef<MapView>(null);
+
+  // Request location permission and update map region when user location changes
+  useEffect(() => {
+    const requestLocationPermission = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationPermissionDenied(true);
+          Alert.alert(
+            'Location Permission Denied',
+            'To use your current location on the map, please enable location permissions in your device settings.',
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (error) {
+        console.error('Error requesting location permission:', error);
+      }
+    };
+
+    requestLocationPermission();
+  }, []);
+
+  // Update map region when user location changes
+  useEffect(() => {
+    if (userLocation && !locationPermissionDenied && mapRef.current) {
+      const newRegion = {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      setRegion(newRegion);
+      
+      // Only animate to the user's location on the first location update
+      // This prevents the map from constantly jumping back to the user's location
+      if (region === initialRegion) {
+        mapRef.current.animateToRegion(newRegion);
+      }
+    }
+  }, [userLocation, locationPermissionDenied]);
 
   const handleRegionChange = (newRegion: Region) => {
     setRegion(newRegion);
@@ -136,7 +178,7 @@ const TrashMap: React.FC<TrashMapProps> = ({
       <MapView
         ref={mapRef}
         style={styles.map}
-        initialRegion={initialRegion}
+        initialRegion={region}
         onRegionChangeComplete={handleRegionChange}
         showsUserLocation={true}
       >

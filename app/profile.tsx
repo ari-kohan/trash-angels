@@ -11,26 +11,13 @@ export default function ProfileScreen() {
     notificationsEnabled, 
     toggleNotifications, 
     notificationRadius,
-    updateNotificationRadius 
+    updateNotificationRadius,
+    userStats,
+    pickupHistory
   } = useAppContext();
   
   // Local state to track slider value before committing the change
   const [sliderValue, setSliderValue] = useState(notificationRadius);
-  
-  // Mock data for user stats - in a real app, this would come from the database
-  const userStats = {
-    trashPickedCount: 12,
-    totalDistance: 5.2, // miles
-    lastPickup: '2025-03-10',
-  };
-  
-  // Mock data for pickup history - in a real app, this would come from the database
-  const pickupHistory = [
-    { id: '1', date: '2025-03-10', location: 'Golden Gate Park' },
-    { id: '2', date: '2025-03-05', location: 'Mission District' },
-    { id: '3', date: '2025-02-28', location: 'Embarcadero' },
-    { id: '4', date: '2025-02-20', location: 'Dolores Park' },
-  ];
 
   const handleRadiusChange = (value: number) => {
     setSliderValue(value);
@@ -51,10 +38,6 @@ export default function ProfileScreen() {
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{userStats.trashPickedCount}</Text>
           <Text style={styles.statLabel}>Trash Picked</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{userStats.totalDistance}</Text>
-          <Text style={styles.statLabel}>Miles Covered</Text>
         </View>
       </View>
       
@@ -110,15 +93,19 @@ export default function ProfileScreen() {
       <View style={styles.historySection}>
         <Text style={styles.sectionTitle}>Pickup History</Text>
         
-        {pickupHistory.map(item => (
-          <View key={item.id} style={styles.historyItem}>
-            <View style={styles.historyDot} />
-            <View style={styles.historyContent}>
-              <Text style={styles.historyDate}>{item.date}</Text>
-              <Text style={styles.historyLocation}>{item.location}</Text>
+        {pickupHistory.length > 0 ? (
+          pickupHistory.map(item => (
+            <View key={item.id} style={styles.historyItem}>
+              <View style={styles.historyDot} />
+              <View style={styles.historyContent}>
+                <Text style={styles.historyDate}>{item.date}</Text>
+                <Text style={styles.historyLocation}>{item.location}</Text>
+              </View>
             </View>
-          </View>
-        ))}
+          ))
+        ) : (
+          <Text style={styles.emptyHistoryText}>No pickup history yet</Text>
+        )}
       </View>
       
       <TouchableOpacity 
@@ -211,21 +198,21 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   sliderContainer: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginTop: 10,
+    marginBottom: 15,
   },
   slider: {
+    width: '100%',
     height: 40,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 5,
+    paddingHorizontal: 10,
   },
   sliderLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#999',
   },
   historySection: {
     backgroundColor: 'white',
@@ -233,32 +220,30 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginHorizontal: 15,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    marginBottom: 20,
   },
   historyItem: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginBottom: 15,
   },
   historyDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: '#4CAF50',
-    marginTop: 6,
+    marginTop: 5,
     marginRight: 10,
   },
   historyContent: {
     flex: 1,
   },
   historyDate: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -267,13 +252,20 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+  emptyHistoryText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 15,
+  },
   backButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 10,
     marginHorizontal: 15,
-    alignItems: 'center',
     marginBottom: 30,
+    alignItems: 'center',
   },
   backButtonText: {
     color: 'white',
