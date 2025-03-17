@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, Image } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useAppContext } from '../context/AppContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,8 +30,13 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="person-circle" size={80} color="#4CAF50" />
-        <Text style={styles.username}>Trash Angel</Text>
+        <View style={styles.profileImageContainer}>
+          <Image 
+            source={require('../assets/images/Raccoon in Garden.png')} 
+            style={styles.profileImage} 
+            resizeMode="contain"
+          />
+        </View>
       </View>
       
       <View style={styles.statsContainer}>
@@ -125,16 +130,19 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 30,
-    backgroundColor: 'white',
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    backgroundColor: '#f8f8f8',
   },
-  username: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 10,
-    color: '#333',
+  profileImageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
   },
   statsContainer: {
     flexDirection: 'row',

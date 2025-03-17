@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, Text, Alert, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text, Alert, Platform, Image } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../context/AppContext';
@@ -197,7 +197,14 @@ const TrashMap: React.FC<TrashMapProps> = ({
 
       {/* Header with title and profile button */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Trash Angels</Text>
+        <View style={styles.titleContainer}>
+          <Image 
+            source={require('../assets/images/Raccoon in Garden.png')} 
+            style={styles.logoImage} 
+            resizeMode="contain"
+          />
+          <Text style={styles.headerTitle}>Trash Angels</Text>
+        </View>
         <TouchableOpacity
           style={styles.profileButton}
           onPress={navigateToProfile}
@@ -254,17 +261,25 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: 0, //, Platform.OS === 'ios' && { paddingTop: 20 }
+    top: 0,
     left: 0,
     right: 0,
-    paddingTop: Platform.OS === 'ios' ? 40 : 0,
     backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingBottom: 10,
+    paddingHorizontal: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    zIndex: 10,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 30,
+    height: 30,
+    marginRight: 8,
   },
   headerTitle: {
     color: 'white',
