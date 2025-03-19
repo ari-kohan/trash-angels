@@ -5,6 +5,7 @@ import { TrashLocation, UserLocation } from '../types';
 import * as Notifications from 'expo-notifications';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { profanity, CensorType } from '@2toad/profanity';
 
 // Define types for user stats and pickup history
 export interface UserStats {
@@ -314,8 +315,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       setLoading(true);
       
+      // Check for potentially harmful characters in the description
+      if (description && /[<>&'"]/.test(description)) {
+        setError("Invalid characters detected in description. Please remove special characters like < > & ' \"");
+        setLoading(false);
+        return; 
+      }
+
+      // Check for curses and slurs in the description
+      if (description && profanity.exists(description)) {
+        setError("Invalid description detected. Please remove curses and slurs.");
+        setLoading(false);
+        return;
+      }
+
+
       // Create a new trash location      
-      console.log('Adding new trash location:', { latitude, longitude, description });
       const { data, error } = await supabase
         .from('trash_locations')
         .insert([{
