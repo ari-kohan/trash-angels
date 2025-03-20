@@ -13,6 +13,11 @@ Thats it!
 No account needed to start cleaning up trash.
 If you would like to recieve push notificatins when new trash is reported in your area, you will need to create an account. Only your account id is stored in the cloud, all other data lives on your phone.
 
+## Tech Stack
+- [React Native](https://reactnative.dev/)
+- [Expo](https://docs.expo.dev/)
+- [Supabase](https://supabase.com/)
+
 
 ## Credits
 Co-coded with windsurf and claude 3.7

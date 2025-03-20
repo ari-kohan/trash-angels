@@ -13,7 +13,8 @@ export default function ProfileScreen() {
     notificationRadius,
     updateNotificationRadius,
     userStats,
-    pickupHistory
+    pickupHistory,
+    isAuthenticated
   } = useAppContext();
   
   // Local state to track slider value before committing the change
@@ -25,6 +26,11 @@ export default function ProfileScreen() {
 
   const handleRadiusChangeComplete = (value: number) => {
     updateNotificationRadius(value);
+  };
+
+  const navigateToCreateAccount = () => {
+    // Using type assertion to tell TypeScript this is a valid route
+    router.push('/register' as any);
   };
 
   return (
@@ -51,13 +57,19 @@ export default function ProfileScreen() {
         
         <View style={styles.settingItem}>
           <Text style={styles.settingLabel}>Notifications</Text>
-          <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={notificationsEnabled ? "#4CAF50" : "#f4f3f4"}
-            ios_backgroundColor="#3e3e3e"
-            onValueChange={toggleNotifications}
-            value={notificationsEnabled}
-          />
+          <View>
+            {!isAuthenticated && (
+              <Text style={styles.authRequiredText}>Account required</Text>
+            )}
+            <Switch
+              trackColor={{ false: "#767577", true: "#81b0ff" }}
+              thumbColor={notificationsEnabled ? "#4CAF50" : "#f4f3f4"}
+              ios_backgroundColor="#3e3e3e"
+              onValueChange={toggleNotifications}
+              value={notificationsEnabled}
+              disabled={!isAuthenticated}
+            />
+          </View>
         </View>
         
         <View style={styles.settingItem}>
@@ -77,7 +89,7 @@ export default function ProfileScreen() {
             minimumTrackTintColor="#4CAF50"
             maximumTrackTintColor="#d3d3d3"
             thumbTintColor="#4CAF50"
-            disabled={!notificationsEnabled}
+            disabled={!notificationsEnabled || !isAuthenticated}
           />
           <View style={styles.sliderLabels}>
             <Text style={styles.sliderLabel}>0.1</Text>
@@ -112,6 +124,15 @@ export default function ProfileScreen() {
           <Text style={styles.emptyHistoryText}>No pickup history yet</Text>
         )}
       </View>
+      
+      {!isAuthenticated && (
+        <TouchableOpacity 
+          style={styles.createAccountButton}
+          onPress={navigateToCreateAccount}
+        >
+          <Text style={styles.createAccountButtonText}>Create Account</Text>
+        </TouchableOpacity>
+      )}
       
       <TouchableOpacity 
         style={styles.backButton}
@@ -206,8 +227,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   sliderContainer: {
-    marginTop: 10,
-    marginBottom: 15,
+    marginVertical: 15,
   },
   slider: {
     width: '100%',
@@ -220,7 +240,7 @@ const styles = StyleSheet.create({
   },
   sliderLabel: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
   },
   historySection: {
     backgroundColor: 'white',
@@ -228,16 +248,18 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginHorizontal: 15,
-    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    marginBottom: 20,
   },
   historyItem: {
     flexDirection: 'row',
-    marginBottom: 15,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   historyDot: {
     width: 10,
@@ -262,10 +284,23 @@ const styles = StyleSheet.create({
   },
   emptyHistoryText: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
     fontStyle: 'italic',
     textAlign: 'center',
-    paddingVertical: 15,
+    marginVertical: 15,
+  },
+  createAccountButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 10,
+    marginHorizontal: 15,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  createAccountButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   backButton: {
     backgroundColor: '#4CAF50',
@@ -279,5 +314,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  authRequiredText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    marginBottom: 4,
+    fontStyle: 'italic',
   },
 });

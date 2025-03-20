@@ -6,6 +6,9 @@ import * as Notifications from 'expo-notifications';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { profanity, CensorType } from '@2toad/profanity';
+import { Session } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
+
 
 // Define types for user stats and pickup history
 export interface UserStats {
@@ -34,6 +37,8 @@ interface AppContextType {
   pickupHistory: PickupHistoryItem[];
   updateUserStats: (stats: Partial<UserStats>) => Promise<void>;
   addPickupHistoryItem: (item: PickupHistoryItem) => Promise<void>;
+  session: Session | null;
+  isAuthenticated: boolean;
 }
 
 // Storage keys
@@ -72,6 +77,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     lastPickup: '',
   });
   const [pickupHistory, setPickupHistory] = useState<PickupHistoryItem[]>([]);
+  const [session, setSession] = useState<Session | null>(null);
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  // Check for authentication status
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setIsAuthenticated(!!currentSession);
+        
+        // If user just signed in, register their push token
+        if (event === 'SIGNED_IN' && expoPushToken && currentSession?.user?.id) {
+          registerUserPushToken(currentSession.user.id, expoPushToken);
+        }
+        
+        // If user signed out, clear their push token
+        if (event === 'SIGNED_OUT') {
+          clearUserPushToken();
+        }
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      setIsAuthenticated(!!initialSession);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [expoPushToken]);
 
   // Initialize local storage with sample data if it doesn't exist
   useEffect(() => {
@@ -148,10 +187,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleNotifications = async () => {
+    // Only allow toggling notifications if user is authenticated
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Authentication Required', 
+        'You need to create an account to enable notifications.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     try {
       const newValue = !notificationsEnabled;
       setNotificationsEnabled(newValue);
       await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, JSON.stringify(newValue));
+      
+      // If enabling notifications, make sure we have a push token
+      if (newValue && !expoPushToken) {
+        const token = await registerForPushNotificationsAsync();
+        if (token && session?.user) {
+          await registerUserPushToken(session.user.id, token);
+        }
+      }
     } catch (err) {
       console.error('Error toggling notifications:', err);
     }
@@ -166,11 +223,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Register user's push token in the database
+  const registerUserPushToken = async (userId: string, token: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_push_tokens')
+        .upsert(
+          { 
+            user_id: userId, 
+            push_token: token,
+            device_id: Platform.OS, // get native device type (ios or android)
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'user_id' }
+        );
+      
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error registering push token:', err);
+    }
+  };
+
+  // Clear user's push token from the database
+  const clearUserPushToken = async () => {
+    if (!session?.user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_push_tokens')
+        .delete()
+        .eq('user_id', session.user.id);
+      
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error clearing push token:', err);
+    }
+  };
+
   // Setup notifications
   useEffect(() => {
     async function setupNotifications() {
       try {
-        await registerForPushNotificationsAsync();
+        const token = await registerForPushNotificationsAsync();
+        if (token) {
+          setExpoPushToken(token);
+          
+          // If user is already authenticated, register their token
+          if (session?.user) {
+            await registerUserPushToken(session.user.id, token);
+          }
+        }
         
         // Listen for notifications
         const notificationListener = Notifications.addNotificationReceivedListener(notification => {
@@ -186,7 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setupNotifications();
-  }, []);
+  }, [session]);
 
   // Get user location
   useEffect(() => {
@@ -263,8 +365,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const newTrash = payload.new as TrashLocation;
           setTrashLocations(prev => [...prev, newTrash]);
           
-          // Only check if we should notify if we have user location
-          if (userLocation && notificationsEnabled) {
+          // Only check if we should notify if we have user location and user is authenticated
+          if (userLocation && notificationsEnabled && isAuthenticated) {
             // Check if the new trash is within notification radius
             const distance = calculateDistance(
               userLocation.latitude,
@@ -289,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       supabase.removeChannel(trashSubscription);
     };
-  }, [userLocation, notificationsEnabled, notificationRadius]);
+  }, [userLocation, notificationsEnabled, notificationRadius, isAuthenticated]);
 
   const fetchTrashLocations = async () => {
     try {
@@ -417,18 +519,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const sendTrashNotification = async (trash: TrashLocation) => {
-    // Double-check that notifications are enabled before sending
-    if (!notificationsEnabled) return;
+    // Double-check that notifications are enabled and user is authenticated before sending
+    if (!notificationsEnabled || !isAuthenticated || !session?.user) return;
     
     try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Trash Nearby!',
-          body: `There's trash that needs to be picked up nearby. Be an angel and help clean up!`,
-          data: { trash },
-        },
-        trigger: null, // Send immediately
-      });
+      if (expoPushToken) {
+        // For local notifications (when app is in foreground)
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Trash Nearby!',
+            body: `There's trash that needs to be picked up nearby. Be an angel and help clean up!`,
+            data: { trash },
+          },
+          trigger: null, // Send immediately
+        });
+        
+        // For remote notifications (when app is in background or closed)
+        // Call the Supabase function to send push notifications
+        const { data, error } = await supabase.functions.invoke('send-push-notification', {
+          body: { 
+            trash, 
+            userTokens: [expoPushToken] 
+          }
+        });
+        
+        if (error) throw error;
+      }
     } catch (err) {
       console.error('Error sending notification:', err);
     }
@@ -459,8 +575,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
   
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+      alert("Missing project ID");
+      throw new Error("Missing project ID");
+    }
     try {
-      token = (await Notifications.getExpoPushTokenAsync()).data;
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: projectId, // Make sure to set this in your app.json or app.config.js
+      })).data;
       console.log(token);
     } catch (err) {
       console.error('Error getting push token:', err);
@@ -484,7 +608,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userStats,
       pickupHistory,
       updateUserStats,
-      addPickupHistoryItem
+      addPickupHistoryItem,
+      session,
+      isAuthenticated
     }}>
       {children}
     </AppContext.Provider>
