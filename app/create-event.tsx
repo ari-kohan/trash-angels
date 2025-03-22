@@ -3,80 +3,36 @@ import {
   StyleSheet, 
   View, 
   Text, 
-  TextInput, 
   TouchableOpacity, 
-  ActivityIndicator, 
   Alert, 
   KeyboardAvoidingView, 
   Platform,
-  ScrollView,
-  Switch
+  ScrollView
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
-import { sqlFound, profanityFound } from '@/utils/text_parsing';
+import EventForm from '../components/EventForm';
+import { Event } from '../types';
 
 export default function CreateEventScreen() {
   const { userLocation, isAuthenticated, session } = useAppContext();
-  const [title, setTitle] = useState('');
-  const [location, setLocation] = useState('');
-  const [description, setDescription] = useState('');
-  const [organizerName, setOrganizerName] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date(new Date().getTime() + 2 * 60 * 60 * 1000)); // Default to 2 hours later
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [useCurrentLocation, setUseCurrentLocation] = useState(true);
   const [latitude, setLatitude] = useState(userLocation?.latitude || 0);
   const [longitude, setLongitude] = useState(userLocation?.longitude || 0);
-  const [loading, setLoading] = useState(false);
-
-  // Format date for display
-  const formatDate = (date: Date) => {
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  // Handle date changes
-  const onStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      setStartDate(selectedDate);
-      
-      // If end date is before start date, update end date
-      if (endDate < selectedDate) {
-        const newEndDate = new Date(selectedDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
-        setEndDate(newEndDate);
-      }
-    }
-  };
-
-  const onEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
-  };
 
   // Get location from address
-  const getLocationFromAddress = async () => {
-    if (!location.trim()) {
+  const getLocationFromAddress = async (address: string) => {
+    if (!address.trim()) {
       Alert.alert('Error', 'Please enter a location');
       return false;
     }
 
     try {
-      const result = await Location.geocodeAsync(location);
+      const result = await Location.geocodeAsync(address);
       if (result.length > 0) {
         setLatitude(result[0].latitude);
         setLongitude(result[0].longitude);
@@ -92,58 +48,8 @@ export default function CreateEventScreen() {
     }
   };
 
-  // Validate form
-  const validateForm = async () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title for the event');
-      return false;
-    }
-
-    if (sqlFound(title) || profanityFound(title)) {
-      Alert.alert('Error', 'Invalid title detected');
-      return false;
-    }
-
-    if (!organizerName.trim()) {
-      Alert.alert('Error', 'Please enter an organizer name');
-      return false;
-    }
-
-    if (sqlFound(organizerName) || profanityFound(organizerName)) {
-      Alert.alert('Error', 'Invalid organizer name detected');
-      return false;
-    }
-
-    if (startDate >= endDate) {
-      Alert.alert('Error', 'End time must be after start time');
-      return false;
-    }
-
-    if (!useCurrentLocation) {
-      return await getLocationFromAddress();
-    }
-
-    if (sqlFound(location) || profanityFound(location)) {
-      Alert.alert('Error', 'Invalid location detected');
-      return false;
-    }
-
-    if (useCurrentLocation && (!userLocation?.latitude || !userLocation?.longitude)) {
-      Alert.alert('Error', 'Current location is not available. Please enter a location manually.');
-      setUseCurrentLocation(false);
-      return false;
-    }
-
-    if (description && (sqlFound(description) || profanityFound(description))) {
-      Alert.alert('Error', 'Invalid description detected');
-      return false;
-    }
-
-    return true;
-  };
-
   // Handle form submission
-  const handleSubmit = async () => {
+  const handleSubmit = async (eventData: Partial<Event>) => {
     if (!isAuthenticated) {
       Alert.alert(
         'Authentication Required', 
@@ -162,8 +68,11 @@ export default function CreateEventScreen() {
       return;
     }
 
-    const isValid = await validateForm();
-    if (!isValid) return;
+    // Process location if needed
+    if (!useCurrentLocation) {
+      const locationValid = await getLocationFromAddress(eventData.location || '');
+      if (!locationValid) return;
+    }
 
     setLoading(true);
 
@@ -171,15 +80,10 @@ export default function CreateEventScreen() {
       const { data, error } = await supabase
         .from('events')
         .insert({
-          title,
-          location: location.trim() || 'Current Location',
+          ...eventData,
           latitude: useCurrentLocation ? userLocation?.latitude : latitude,
           longitude: useCurrentLocation ? userLocation?.longitude : longitude,
-          start_time: startDate.toISOString(),
-          end_time: endDate.toISOString(),
           organizer_id: session?.user.id,
-          organizer_name: organizerName.trim(),
-          description: description.trim() || null
         })
         .select();
 
@@ -216,109 +120,11 @@ export default function CreateEventScreen() {
           <View style={styles.emptySpace} />
         </View>
 
-        <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Event Title *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter event title"
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Organizer Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter organizer name"
-              value={organizerName}
-              onChangeText={setOrganizerName}
-              maxLength={100}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Location *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter address"
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
-          
-
-          <View style={styles.dateContainer}>
-            <Text style={styles.label}>Start Time *</Text>
-            <TouchableOpacity 
-              style={styles.dateButton}
-              onPress={() => setShowStartDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
-              <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-            </TouchableOpacity>
-            {showStartDatePicker && (
-              <DateTimePicker
-                value={startDate}
-                mode="datetime"
-                display="default"
-                onChange={onStartDateChange}
-                minimumDate={new Date()}
-              />
-            )}
-          </View>
-
-          <View style={styles.dateContainer}>
-            <Text style={styles.label}>End Time *</Text>
-            <TouchableOpacity 
-              style={styles.dateButton}
-              onPress={() => setShowEndDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>{formatDate(endDate)}</Text>
-              <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-            </TouchableOpacity>
-            {showEndDatePicker && (
-              <DateTimePicker
-                value={endDate}
-                mode="datetime"
-                display="default"
-                onChange={onEndDateChange}
-                minimumDate={startDate}
-              />
-            )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Description (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Enter event description, details, what to bring, etc."
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>Create Event</Text>
-            )}
-          </TouchableOpacity>
-          
-          <Text style={styles.noteText}>
-            * Required fields
-          </Text>
-        </View>
+        <EventForm
+          onSubmit={handleSubmit}
+          submitButtonText="Create Event"
+          isLoading={loading}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -353,70 +159,6 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   emptySpace: {
-    width: 34, // Same width as the back button for proper centering
-  },
-  formContainer: {
-    padding: 20,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  dateContainer: {
-    marginBottom: 20,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  noteText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+    width: 30,
   },
 });

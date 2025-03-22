@@ -1,27 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Alert, 
   ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  Switch,
+  Platform
 } from 'react-native';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { useAppContext } from '../context/AppContext';
 import { Event } from '../types';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { sqlFound, profanityFound } from '@/utils/text_parsing';
-import { Platform } from "react-native";
+import EventForm from '../components/EventForm';
 
 export default function EventDetailsScreen() {
   const { id } = useLocalSearchParams();
-  const { isAuthenticated, session } = useAppContext();
+  const router = useRouter();
+  const { isAuthenticated, session, updateEvent } = useAppContext();
   const userId = session?.user?.id;
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -30,16 +28,6 @@ export default function EventDetailsScreen() {
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [attendeeCount, setAttendeeCount] = useState(0);
-  
-  // Edit form state
-  const [title, setTitle] = useState('');
-  const [location, setLocation] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [organizerName, setOrganizerName] = useState('');
-  const [description, setDescription] = useState('');
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -76,14 +64,6 @@ export default function EventDetailsScreen() {
         
         // Set attendee count
         setAttendeeCount(data.attendees ? data.attendees.length : 0);
-        
-        // Initialize form data for editing
-        setTitle(data.title);
-        setLocation(data.location);
-        setStartDate(new Date(data.start_time));
-        setEndDate(new Date(data.end_time));
-        setOrganizerName(data.organizer_name);
-        setDescription(data.description || '');
       }
     } catch (error) {
       console.error('Error fetching event details:', error);
@@ -141,92 +121,20 @@ export default function EventDetailsScreen() {
     }
   };
 
-  const validateForm = () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
-      return false;
-    }
-
-    if (sqlFound(title) || profanityFound(title)) {
-      Alert.alert('Error', 'Invalid title detected');
-      return false;
-    }
-
-    if (!organizerName.trim()) {
-      Alert.alert('Error', 'Please enter an organizer name');
-      return false;
-    }
-
-    if (sqlFound(organizerName) || profanityFound(organizerName)) {
-      Alert.alert('Error', 'Invalid organizer name detected');
-      return false;
-    }
-
-    if (startDate >= endDate) {
-      Alert.alert('Error', 'End time must be after start time');
-      return false;
-    }
-
-    if (!location.trim()) {
-      Alert.alert('Error', 'Please enter a location');
-      return false;
-    }
-
-    if (sqlFound(location) || profanityFound(location)) {
-      Alert.alert('Error', 'Invalid location detected');
-      return false;
-    }
-
-    if (description && (sqlFound(description) || profanityFound(description))) {
-      Alert.alert('Error', 'Invalid description detected');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleUpdateEvent = async () => {
-    if (!isAuthenticated || !isOrganizer || !event) {
-      Alert.alert('Error', 'You must be the organizer to update this event');
-      return;
-    }
+  const handleUpdateEvent = async (eventData: Partial<Event>) => {
+    if (!event) return;
     
-    if (!validateForm()) {
-      return;
-    }
-    
-    setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('events')
-        .update({
-          title,
-          location,
-          start_time: startDate.toISOString(),
-          end_time: endDate.toISOString(),
-          organizer_name: organizerName,
-          description,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', event.id);
+      setSubmitting(true);
       
-      if (error) {
-        throw error;
-      }
+      await updateEvent(event.id, eventData);
       
       // Update local state
-      setEvent({
-        ...event,
-        title,
-        location,
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
-        organizer_name: organizerName,
-        description,
-        updated_at: new Date().toISOString()
-      });
+      setEvent({ ...event, ...eventData });
       
+      // Exit edit mode
       setEditMode(false);
+      
       Alert.alert('Success', 'Event updated successfully');
     } catch (error) {
       console.error('Error updating event:', error);
@@ -254,7 +162,7 @@ export default function EventDetailsScreen() {
     });
   };
 
-  const getEventStatus = () => {
+  const getEventStatus = (event: Event) => {
     if (!event) return '';
     
     const now = new Date();
@@ -271,7 +179,9 @@ export default function EventDetailsScreen() {
   };
 
   const getStatusColor = () => {
-    const status = getEventStatus();
+    if (!event) return '#999'; // Default gray color
+    
+    const status = getEventStatus(event);
     switch (status) {
       case 'Upcoming':
         return '#2196F3'; // Blue
@@ -280,7 +190,7 @@ export default function EventDetailsScreen() {
       case 'Past':
         return '#9E9E9E'; // Gray
       default:
-        return '#000000';
+        return '#999'; // Default gray
     }
   };
 
@@ -291,12 +201,6 @@ export default function EventDetailsScreen() {
     } else {
       // Enter edit mode and initialize form with current event data
       if (event) {
-        setTitle(event.title);
-        setDescription(event.description || '');
-        setLocation(event.location);
-        setStartDate(new Date(event.start_time));
-        setEndDate(new Date(event.end_time));
-        setOrganizerName(event.organizer_name);
         setEditMode(true);
       }
     }
@@ -346,128 +250,20 @@ export default function EventDetailsScreen() {
       <ScrollView style={styles.container}>
         {editMode ? (
           // Edit Mode Form
-          <View style={styles.formContainer}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Title *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Event Title"
-                value={title}
-                onChangeText={setTitle}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Organizer Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Your Name"
-                value={organizerName}
-                onChangeText={setOrganizerName}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Location *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter address"
-                value={location}
-                onChangeText={setLocation}
-              />
-            </View>
-
-            <View style={styles.dateContainer}>
-              <Text style={styles.label}>Start Time *</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowStartDatePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>
-                  {startDate.toLocaleDateString()} {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-              {showStartDatePicker && (
-                <DateTimePicker
-                  value={startDate}
-                  mode="datetime"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowStartDatePicker(false);
-                    if (selectedDate) {
-                      setStartDate(selectedDate);
-                    }
-                  }}
-                />
-              )}
-            </View>
-
-            <View style={styles.dateContainer}>
-              <Text style={styles.label}>End Time *</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowEndDatePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>
-                  {endDate.toLocaleDateString()} {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-              {showEndDatePicker && (
-                <DateTimePicker
-                  value={endDate}
-                  mode="datetime"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowEndDatePicker(false);
-                    if (selectedDate) {
-                      setEndDate(selectedDate);
-                    }
-                  }}
-                />
-              )}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Description (Optional)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Describe the event..."
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => setEditMode(false)}
-                disabled={submitting}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.button, styles.submitButton]}
-                onPress={handleUpdateEvent}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.buttonText}>Update Event</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+          <EventForm
+            initialData={event}
+            onSubmit={handleUpdateEvent}
+            onCancel={() => setEditMode(false)}
+            submitButtonText="Update Event"
+            isLoading={submitting}
+          />
         ) : (
           // View Mode
           <View style={styles.detailsContainer}>
             <View style={styles.headerSection}>
               <Text style={styles.title}>{event.title}</Text>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
-                <Text style={styles.statusText}>{getEventStatus()}</Text>
+                <Text style={styles.statusText}>{getEventStatus(event)}</Text>
               </View>
             </View>
             
@@ -509,7 +305,7 @@ export default function EventDetailsScreen() {
               </View>
             )}
             
-            {isAuthenticated && (
+            {isAuthenticated && event && getEventStatus(event) !== 'Past' && (
               <View style={styles.actionSection}>
                 {isOrganizer ? (
                   <TouchableOpacity 
@@ -678,71 +474,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   rsvpButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  formContainer: {
-    padding: 16,
-  },
-  inputContainer: {
-    marginTop: Platform.OS === 'ios' ? 40 : 0,
-    marginBottom: 5,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
-  },
-  input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  dateContainer: {
-    marginBottom: 16,
-  },
-  dateButton: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#9E9E9E',
-    marginRight: 8,
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    marginLeft: 8,
-  },
-  buttonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,

@@ -240,18 +240,6 @@ export default function EventsScreen() {
             </>
           )}
           
-          {events.length > 0 && (
-            <TouchableOpacity
-              style={[
-                styles.fab,
-                !isAuthenticated && styles.fabDisabled
-              ]}
-              onPress={() => router.push('/create-event')}
-              disabled={!isAuthenticated}
-            >
-              <Ionicons name="add" size={24} color="white" />
-            </TouchableOpacity>
-          )}
         </>
       )}
     </View>
