@@ -3,7 +3,7 @@ import { AppProvider } from "../context/AppContext";
 import * as Notifications from 'expo-notifications';
 import { useEffect } from "react";
 import { Platform } from "react-native";
-import * as Linking from "expo-linking";
+import 'expo-dev-client';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();

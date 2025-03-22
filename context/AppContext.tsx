@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
-import { TrashLocation, UserLocation } from '../types';
+import { TrashLocation, UserLocation, Event } from '../types';
 import * as Notifications from 'expo-notifications';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,8 +25,10 @@ export interface PickupHistoryItem {
 interface AppContextType {
   userLocation: UserLocation | null;
   trashLocations: TrashLocation[];
+  events: Event[];
   addTrashLocation: (latitude: number, longitude: number, description?: string) => Promise<void>;
   markTrashAsPickedUp: (id: string) => Promise<void>;
+  fetchEvents: () => Promise<void>;
   loading: boolean;
   error: string | null;
   notificationsEnabled: boolean;
@@ -68,10 +70,11 @@ export const useAppContext = () => {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [trashLocations, setTrashLocations] = useState<TrashLocation[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-  const [notificationRadius, setNotificationRadius] = useState<number>(0.2); // Default to 0.2 miles
+  const [notificationRadius, setNotificationRadius] = useState<number>(0.5); // Default to 0.5 miles
   const [userStats, setUserStats] = useState<UserStats>({
     trashPickedCount: 0,
     lastPickup: '',
@@ -344,11 +347,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setupLocation();
   }, []);
 
+  // Fetch events from Supabase
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('start_time', { ascending: true });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setEvents(data);
+      }
+    } catch (err: any) {
+      console.error('Error fetching events:', err);
+      setError(err.message);
+    }
+  };
+
+  // Fetch trash locations and events when the component mounts
+  useEffect(() => {
+    const fetchTrashLocations = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trash_locations')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          setTrashLocations(data);
+        }
+
+        // Also fetch events
+        await fetchEvents();
+        
+        setLoading(false);
+      } catch (err: any) {
+        console.error('Error fetching trash locations:', err);
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+
+    fetchTrashLocations();
+  }, []);
+
   // Fetch trash locations from Supabase
   useEffect(() => {
-    fetchTrashLocations();
-
-    // Set up realtime subscription for new trash locations
     const trashSubscription = supabase
       .channel('trash_locations_changes')
       .on(
@@ -392,26 +445,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       supabase.removeChannel(trashSubscription);
     };
   }, [userLocation, notificationsEnabled, notificationRadius, isAuthenticated]);
-
-  const fetchTrashLocations = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('trash_locations')
-        .select('*')
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      
-      setTrashLocations(data || []);
-    } catch (err) {
-      console.error('Error fetching trash locations:', err);
-      setError('Failed to fetch trash locations');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const addTrashLocation = async (latitude: number, longitude: number, description?: string) => {
     try {
@@ -594,24 +627,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   return (
-    <AppContext.Provider value={{
-      userLocation,
-      trashLocations,
-      addTrashLocation,
-      markTrashAsPickedUp,
-      loading,
-      error,
-      notificationsEnabled,
-      toggleNotifications,
-      notificationRadius,
-      updateNotificationRadius,
-      userStats,
-      pickupHistory,
-      updateUserStats,
-      addPickupHistoryItem,
-      session,
-      isAuthenticated
-    }}>
+    <AppContext.Provider
+      value={{
+        userLocation,
+        trashLocations,
+        events,
+        addTrashLocation,
+        markTrashAsPickedUp,
+        fetchEvents,
+        loading,
+        error,
+        notificationsEnabled,
+        toggleNotifications,
+        notificationRadius,
+        updateNotificationRadius,
+        userStats,
+        pickupHistory,
+        updateUserStats,
+        addPickupHistoryItem,
+        session,
+        isAuthenticated,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

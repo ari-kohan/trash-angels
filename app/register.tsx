@@ -69,7 +69,7 @@ export default function RegisterScreen() {
 
         <View style={styles.formContainer}>
           <Text style={styles.subtitle}>
-            Create an account to receive notifications about trash in your area
+            Create an account to receive notifications about trash pickup events in your area
           </Text>
           
           {!magicLinkSent ? (

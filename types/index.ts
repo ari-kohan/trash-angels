@@ -23,3 +23,18 @@ export interface UserProfile {
   notifications_enabled: boolean;
   trash_picked_count: number;
 }
+
+export interface Event {
+  id: string;
+  title: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  start_time: string;
+  end_time: string;
+  organizer_id: string;
+  organizer_name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}

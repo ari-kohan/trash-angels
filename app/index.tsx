@@ -1,8 +1,10 @@
 import React from "react";
-import { StyleSheet, View, Text, ActivityIndicator, Image } from "react-native";
+import { StyleSheet, View, Text, ActivityIndicator, Image, TouchableOpacity } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { router } from "expo-router";
 import TrashMap from "../components/TrashMap";
 import { useAppContext } from "../context/AppContext";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Index() {
   const { loading, error } = useAppContext();
@@ -33,6 +35,25 @@ export default function Index() {
     <View style={styles.container}>
       <StatusBar style="light" />
       <TrashMap />
+      
+      {/* Floating Action Buttons */}
+      <View style={styles.fabContainer}>
+        <TouchableOpacity
+          style={[styles.fab, styles.fabEvents]}
+          onPress={() => router.push('/events')}
+        >
+          <Ionicons name="list" size={24} color="white" />
+          <Text style={styles.fabText}>View Events</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.fab, styles.fabCreate]}
+          onPress={() => router.push('/create-event')}
+        >
+          <Ionicons name="calendar" size={24} color="white" />
+          <Text style={styles.fabText}>Create Event</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -63,5 +84,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "red",
     textAlign: "center",
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    alignItems: 'flex-end',
+  },
+  fab: {
+    borderRadius: 28,
+    width: 'auto',
+    height: 56,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    marginBottom: 10,
+  },
+  fabCreate: {
+    backgroundColor: '#4CAF50',
+  },
+  fabEvents: {
+    backgroundColor: '#2196F3',
+  },
+  fabText: {
+    color: 'white',
+    marginLeft: 8,
+    fontWeight: 'bold',
   },
 });

@@ -38,13 +38,22 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View style={styles.profileImageContainer}>
           <Image 
-            source={require('../assets/images/Raccoon in Garden.png')} 
+            source={require('../assets/images/icon.png')} 
             style={styles.profileImage} 
             resizeMode="contain"
           />
         </View>
       </View>
       
+      {!isAuthenticated && (
+        <TouchableOpacity 
+          style={styles.createAccountButton}
+          onPress={navigateToCreateAccount}
+        >
+          <Text style={styles.createAccountButtonText}>Create Account</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{userStats.trashPickedCount}</Text>
@@ -124,15 +133,6 @@ export default function ProfileScreen() {
           <Text style={styles.emptyHistoryText}>No pickup history yet</Text>
         )}
       </View>
-      
-      {!isAuthenticated && (
-        <TouchableOpacity 
-          style={styles.createAccountButton}
-          onPress={navigateToCreateAccount}
-        >
-          <Text style={styles.createAccountButtonText}>Create Account</Text>
-        </TouchableOpacity>
-      )}
       
       <TouchableOpacity 
         style={styles.backButton}

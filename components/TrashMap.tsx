@@ -199,7 +199,7 @@ const TrashMap: React.FC<TrashMapProps> = ({
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Image 
-            source={require('../assets/images/Raccoon in Garden.png')} 
+            source={require('../assets/images/icon.png')} 
             style={styles.logoImage} 
             resizeMode="contain"
           />
