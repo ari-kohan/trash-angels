@@ -37,4 +37,5 @@ export interface Event {
   description?: string;
   created_at: string;
   updated_at: string;
+  attendees?: string[];
 }

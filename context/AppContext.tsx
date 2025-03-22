@@ -5,9 +5,9 @@ import { TrashLocation, UserLocation, Event } from '../types';
 import * as Notifications from 'expo-notifications';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { profanity, CensorType } from '@2toad/profanity';
 import { Session } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import { sqlFound, profanityFound } from '@/utils/text_parsing';
 
 
 // Define types for user stats and pickup history
@@ -29,6 +29,8 @@ interface AppContextType {
   addTrashLocation: (latitude: number, longitude: number, description?: string) => Promise<void>;
   markTrashAsPickedUp: (id: string) => Promise<void>;
   fetchEvents: () => Promise<void>;
+  updateEvent: (id: string, eventData: Partial<Event>) => Promise<void>;
+  rsvpToEvent: (eventId: string, attending: boolean) => Promise<void>;
   loading: boolean;
   error: string | null;
   notificationsEnabled: boolean;
@@ -362,9 +364,97 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data) {
         setEvents(data);
       }
-    } catch (err: any) {
-      console.error('Error fetching events:', err);
-      setError(err.message);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      setError('Failed to fetch events');
+    }
+  };
+
+  // Update an event
+  const updateEvent = async (id: string, eventData: Partial<Event>) => {
+    if (!isAuthenticated) {
+      setError('You must be logged in to update an event');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({
+          ...eventData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update local events state
+      setEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === id ? { ...event, ...eventData, updated_at: new Date().toISOString() } : event
+        )
+      );
+    } catch (error) {
+      console.error('Error updating event:', error);
+      setError('Failed to update event');
+      throw error;
+    }
+  };
+
+  // RSVP to an event
+  const rsvpToEvent = async (eventId: string, attending: boolean) => {
+    if (!isAuthenticated || !session?.user?.id) {
+      setError('You must be logged in to RSVP to an event');
+      return;
+    }
+
+    try {
+      // Get the current event
+      const eventIndex = events.findIndex(e => e.id === eventId);
+      if (eventIndex === -1) {
+        throw new Error('Event not found');
+      }
+      
+      const event = events[eventIndex];
+      const userId = session.user.id;
+      const currentAttendees = event.attendees || [];
+      
+      // Update attendees list based on attending status
+      let updatedAttendees;
+      if (attending) {
+        // Add user to attendees if not already included
+        if (!currentAttendees.includes(userId)) {
+          updatedAttendees = [...currentAttendees, userId];
+        } else {
+          updatedAttendees = currentAttendees;
+        }
+      } else {
+        // Remove user from attendees
+        updatedAttendees = currentAttendees.filter(id => id !== userId);
+      }
+      
+      // Update in Supabase
+      const { error } = await supabase
+        .from('events')
+        .update({ attendees: updatedAttendees })
+        .eq('id', eventId);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update local state
+      setEvents(prevEvents => 
+        prevEvents.map(e => 
+          e.id === eventId ? { ...e, attendees: updatedAttendees } : e
+        )
+      );
+    } catch (error) {
+      console.error('Error updating RSVP:', error);
+      setError('Failed to update your RSVP');
+      throw error;
     }
   };
 
@@ -451,14 +541,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(true);
       
       // Check for potentially harmful characters in the description
-      if (description && /[<>&'"]/.test(description)) {
+      if (description && sqlFound(description)) {
         setError("Invalid characters detected in description. Please remove special characters like < > & ' \"");
         setLoading(false);
         return; 
       }
 
       // Check for curses and slurs in the description
-      if (description && profanity.exists(description)) {
+      if (description && profanityFound(description)) {
         setError("Invalid description detected. Please remove curses and slurs.");
         setLoading(false);
         return;
@@ -635,6 +725,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addTrashLocation,
         markTrashAsPickedUp,
         fetchEvents,
+        updateEvent,
+        rsvpToEvent,
         loading,
         error,
         notificationsEnabled,

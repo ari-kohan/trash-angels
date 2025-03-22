@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
+import { sqlFound, profanityFound } from '@/utils/text_parsing';
 
 export default function CreateEventScreen() {
   const { userLocation, isAuthenticated, session } = useAppContext();
@@ -98,8 +99,18 @@ export default function CreateEventScreen() {
       return false;
     }
 
+    if (sqlFound(title) || profanityFound(title)) {
+      Alert.alert('Error', 'Invalid title detected');
+      return false;
+    }
+
     if (!organizerName.trim()) {
       Alert.alert('Error', 'Please enter an organizer name');
+      return false;
+    }
+
+    if (sqlFound(organizerName) || profanityFound(organizerName)) {
+      Alert.alert('Error', 'Invalid organizer name detected');
       return false;
     }
 
@@ -112,9 +123,19 @@ export default function CreateEventScreen() {
       return await getLocationFromAddress();
     }
 
+    if (sqlFound(location) || profanityFound(location)) {
+      Alert.alert('Error', 'Invalid location detected');
+      return false;
+    }
+
     if (useCurrentLocation && (!userLocation?.latitude || !userLocation?.longitude)) {
       Alert.alert('Error', 'Current location is not available. Please enter a location manually.');
       setUseCurrentLocation(false);
+      return false;
+    }
+
+    if (description && (sqlFound(description) || profanityFound(description))) {
+      Alert.alert('Error', 'Invalid description detected');
       return false;
     }
 
@@ -218,27 +239,16 @@ export default function CreateEventScreen() {
             />
           </View>
 
-          <View style={styles.switchContainer}>
-            <Text style={styles.label}>Use Current Location</Text>
-            <Switch
-              value={useCurrentLocation}
-              onValueChange={setUseCurrentLocation}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={useCurrentLocation ? '#2196F3' : '#f4f3f4'}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Location *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter address"
+              value={location}
+              onChangeText={setLocation}
             />
           </View>
-
-          {!useCurrentLocation && (
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Location *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter address"
-                value={location}
-                onChangeText={setLocation}
-              />
-            </View>
-          )}
+          
 
           <View style={styles.dateContainer}>
             <Text style={styles.label}>Start Time *</Text>

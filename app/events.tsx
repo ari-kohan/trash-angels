@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -12,97 +12,164 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../context/AppContext';
 import { Event } from '../types';
+import { supabase } from '../lib/supabase';
 
 export default function EventsScreen() {
   const { events, fetchEvents, isAuthenticated } = useAppContext();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const subscriptionRef = useRef<any>(null);
 
   useEffect(() => {
     loadEvents();
+    
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+    };
   }, []);
+  
+  useEffect(() => {
+    const subscription = supabase
+      .channel('events-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', 
+          schema: 'public',
+          table: 'events',
+        },
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          fetchEvents();
+        }
+      )
+      .subscribe();
+      
+    subscriptionRef.current = subscription;
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchEvents]);
 
   const loadEvents = async () => {
     setLoading(true);
-    await fetchEvents();
-    setLoading(false);
+    try {
+      await fetchEvents();
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchEvents();
-    setRefreshing(false);
-  };
+    try {
+      await fetchEvents();
+    } catch (error) {
+      console.error('Error refreshing events:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchEvents]);
 
   // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
     });
   };
 
-  // Calculate if event is upcoming, ongoing, or past
+  // Format time for display
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Get event status (upcoming, ongoing, past)
   const getEventStatus = (event: Event) => {
     const now = new Date();
     const startTime = new Date(event.start_time);
     const endTime = new Date(event.end_time);
-
+    
     if (now < startTime) {
-      return 'upcoming';
+      return 'Upcoming';
     } else if (now >= startTime && now <= endTime) {
-      return 'ongoing';
+      return 'Ongoing';
     } else {
-      return 'past';
+      return 'Past';
     }
   };
 
-  // Render event item
+  // Get status color based on event status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Upcoming':
+        return '#2196F3'; // Blue
+      case 'Ongoing':
+        return '#4CAF50'; // Green
+      case 'Past':
+        return '#9E9E9E'; // Gray
+      default:
+        return '#000000';
+    }
+  };
+
+  // Navigate to event details
+  const navigateToEventDetails = (eventId: string) => {
+    router.push(`/event-details?id=${eventId}`);
+  };
+
+  // Render individual event item
   const renderEventItem = ({ item }: { item: Event }) => {
     const status = getEventStatus(item);
+    const statusColor = getStatusColor(status);
     
     return (
       <TouchableOpacity 
-        style={[
-          styles.eventCard,
-          status === 'ongoing' && styles.ongoingEvent,
-          status === 'past' && styles.pastEvent
-        ]}
-        onPress={() => {
-          // Navigate to event details screen when implemented
-          // router.push(`/event/${item.id}`);
-        }}
+        style={styles.eventCard}
+        onPress={() => navigateToEventDetails(item.id)}
       >
         <View style={styles.eventHeader}>
           <Text style={styles.eventTitle}>{item.title}</Text>
-          {status === 'ongoing' && (
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>Ongoing</Text>
-            </View>
-          )}
+          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+            <Text style={styles.statusText}>{status}</Text>
+          </View>
         </View>
         
-        <View style={styles.eventDetails}>
-          <View style={styles.detailRow}>
-            <Ionicons name="location-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>{item.location}</Text>
+        <View style={styles.eventInfo}>
+          <View style={styles.infoRow}>
+            <Ionicons name="calendar-outline" size={16} color="#666" style={styles.infoIcon} />
+            <Text style={styles.infoText}>{formatDate(item.start_time)}</Text>
           </View>
           
-          <View style={styles.detailRow}>
-            <Ionicons name="time-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>
-              {formatDate(item.start_time)} - {formatDate(item.end_time)}
-            </Text>
+          <View style={styles.infoRow}>
+            <Ionicons name="time-outline" size={16} color="#666" style={styles.infoIcon} />
+            <Text style={styles.infoText}>{formatTime(item.start_time)} - {formatTime(item.end_time)}</Text>
           </View>
           
-          <View style={styles.detailRow}>
-            <Ionicons name="person-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>Organized by {item.organizer_name}</Text>
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={16} color="#666" style={styles.infoIcon} />
+            <Text style={styles.infoText}>{item.location}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="person-outline" size={16} color="#666" style={styles.infoIcon} />
+            <Text style={styles.infoText}>Organized by {item.organizer_name}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="people-outline" size={16} color="#666" style={styles.infoIcon} />
+            <Text style={styles.infoText}>{item.attendees ? item.attendees.length : 0} attending</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -175,10 +242,12 @@ export default function EventsScreen() {
           
           {events.length > 0 && (
             <TouchableOpacity
-              style={styles.fab}
+              style={[
+                styles.fab,
+                !isAuthenticated && styles.fabDisabled
+              ]}
               onPress={() => router.push('/create-event')}
               disabled={!isAuthenticated}
-              opacity={isAuthenticated ? 1 : 0.5}
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>
@@ -214,7 +283,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   emptySpace: {
-    width: 34, // Same width as the back button for proper centering
+    width: 34, 
   },
   loadingContainer: {
     flex: 1,
@@ -228,7 +297,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 80, // Extra padding at bottom for FAB
+    paddingBottom: 80, 
   },
   eventCard: {
     backgroundColor: 'white',
@@ -240,15 +309,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  ongoingEvent: {
-    borderLeftColor: '#FF9800',
-  },
-  pastEvent: {
-    borderLeftColor: '#9E9E9E',
-    opacity: 0.8,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -263,7 +323,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statusBadge: {
-    backgroundColor: '#FF9800',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -273,16 +332,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  eventDetails: {
+  eventInfo: {
     marginTop: 8,
   },
-  detailRow: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
-  detailText: {
-    marginLeft: 8,
+  infoIcon: {
+    marginRight: 8,
+  },
+  infoText: {
     fontSize: 14,
     color: '#666',
   },
@@ -356,5 +417,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  fabDisabled: {
+    opacity: 0.5,
   },
 });
