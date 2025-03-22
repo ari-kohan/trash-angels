@@ -173,6 +173,14 @@ const TrashMap: React.FC<TrashMapProps> = ({
     router.push('/profile');
   };
 
+  const navigateToEvents = () => {
+    router.push('/events');
+  };
+
+  const navigateToCreateEvent = () => {
+    router.push('/create-event');
+  };
+
   return (
     <View style={styles.container}>
       <MapView
@@ -195,7 +203,7 @@ const TrashMap: React.FC<TrashMapProps> = ({
         ))}
       </MapView>
 
-      {/* Header with title and profile button */}
+      {/* Header with title and action buttons */}
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Image 
@@ -205,12 +213,22 @@ const TrashMap: React.FC<TrashMapProps> = ({
           />
           <Text style={styles.headerTitle}>Trash Angels</Text>
         </View>
-        <TouchableOpacity
-          style={styles.profileButton}
-          onPress={navigateToProfile}
-        >
-          <Ionicons name="person-circle" size={28} color="white" />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={navigateToEvents}
+          >
+            <Ionicons name="calendar" size={24} color="white" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={navigateToProfile}
+          >
+            <Ionicons name="person-circle" size={28} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Floating action buttons */}
@@ -285,6 +303,14 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   profileButton: {
     padding: 5,

@@ -135,34 +135,50 @@ export default function EventsScreen() {
               <Text style={styles.emptyText}>No events found</Text>
               <Text style={styles.emptySubtext}>Be the first to organize a trash pickup event!</Text>
               
-              <TouchableOpacity 
-                style={styles.createButton}
-                onPress={() => router.push('/create-event')}
-              >
-                <Text style={styles.createButtonText}>Create Event</Text>
-              </TouchableOpacity>
+              {isAuthenticated && (
+                <TouchableOpacity 
+                  style={styles.createButton}
+                  onPress={() => router.push('/create-event')}
+                >
+                  <Text style={styles.createButtonText}>Create Event</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
-            <FlatList
-              data={events}
-              renderItem={renderEventItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContainer}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  colors={['#4CAF50']}
-                  tintColor="#4CAF50"
-                />
-              }
-            />
+            <>
+              {isAuthenticated && (
+                <TouchableOpacity 
+                  style={styles.createEventButton}
+                  onPress={() => router.push('/create-event')}
+                >
+                  <Ionicons name="add-circle" size={20} color="white" style={styles.createEventIcon} />
+                  <Text style={styles.createEventText}>Create New Event</Text>
+                </TouchableOpacity>
+              )}
+              
+              <FlatList
+                data={events}
+                renderItem={renderEventItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContainer}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={['#4CAF50']}
+                    tintColor="#4CAF50"
+                  />
+                }
+              />
+            </>
           )}
           
           {events.length > 0 && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.fab}
               onPress={() => router.push('/create-event')}
+              disabled={!isAuthenticated}
+              opacity={isAuthenticated ? 1 : 0.5}
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>
@@ -296,6 +312,31 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   createButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  createEventButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
+  },
+  createEventIcon: {
+    marginRight: 8,
+  },
+  createEventText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
