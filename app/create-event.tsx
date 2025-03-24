@@ -103,10 +103,10 @@ export default function CreateEventScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={100}
+    <View 
+      // style={styles.container}
+      // behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // keyboardVerticalOffset={100}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
@@ -126,7 +126,7 @@ export default function CreateEventScreen() {
           isLoading={loading}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

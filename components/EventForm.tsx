@@ -13,11 +13,16 @@ import {
   InputAccessoryView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+//import DateTimePicker from '@react-native-community/datetimepicker';
 import { Event } from '../types';
 import { sqlFound, profanityFound } from '@/utils/text_parsing';
 import 'react-native-get-random-values';
 import GooglePlacesInput, { GooglePlacesInputRef } from './GooglePlacesInput';
+import DatePicker from 'react-native-date-picker'
+
+// print package version of react-native-date-picker to console
+
+
 
 interface EventFormProps {
   initialData?: Partial<Event>;
@@ -54,6 +59,12 @@ const EventForm: React.FC<EventFormProps> = ({
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+    });
+  };
+
+  // Format time for display
+  const formatTime = (date: Date) => {
+    return date.toLocaleString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -64,11 +75,31 @@ const EventForm: React.FC<EventFormProps> = ({
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartDatePicker(false);
     if (selectedDate) {
-      setStartDate(selectedDate);
+      const newDate = new Date(startDate);
+      newDate.setFullYear(selectedDate.getFullYear());
+      newDate.setMonth(selectedDate.getMonth());
+      newDate.setDate(selectedDate.getDate());
+      setStartDate(newDate);
       
       // If end date is before start date, update end date
-      if (endDate < selectedDate) {
-        const newEndDate = new Date(selectedDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+      if (endDate < newDate) {
+        const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+        setEndDate(newEndDate);
+      }
+    }
+  };
+
+  const onStartTimeChange = (event: any, selectedTime?: Date) => {
+    setShowStartTimePicker(false);
+    if (selectedTime) {
+      const newDate = new Date(startDate);
+      newDate.setHours(selectedTime.getHours());
+      newDate.setMinutes(selectedTime.getMinutes());
+      setStartDate(newDate);
+      
+      // If end date is before start date, update end date
+      if (endDate < newDate) {
+        const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
         setEndDate(newEndDate);
       }
     }
@@ -77,7 +108,21 @@ const EventForm: React.FC<EventFormProps> = ({
   const onEndDateChange = (event: any, selectedDate?: Date) => {
     setShowEndDatePicker(false);
     if (selectedDate) {
-      setEndDate(selectedDate);
+      const newDate = new Date(endDate);
+      newDate.setFullYear(selectedDate.getFullYear());
+      newDate.setMonth(selectedDate.getMonth());
+      newDate.setDate(selectedDate.getDate());
+      setEndDate(newDate);
+    }
+  };
+
+  const onEndTimeChange = (event: any, selectedTime?: Date) => {
+    setShowEndTimePicker(false);
+    if (selectedTime) {
+      const newDate = new Date(endDate);
+      newDate.setHours(selectedTime.getHours());
+      newDate.setMinutes(selectedTime.getMinutes());
+      setEndDate(newDate);
     }
   };
 
@@ -257,43 +302,134 @@ const EventForm: React.FC<EventFormProps> = ({
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Start Time *</Text>
-          <TouchableOpacity 
-            style={styles.dateButton}
-            onPress={() => setShowStartDatePicker(true)}
-          >
-            <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
-            <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-          </TouchableOpacity>
-          {showStartDatePicker && (
-            <DateTimePicker
-              value={startDate}
-              mode="datetime"
-              display="default"
-              onChange={onStartDateChange}
-              minimumDate={new Date()}
-            />
-          )}
+          <Text style={styles.label}>Start Date and Time *</Text>
+          <View style={styles.dateTimeRow}>
+            <View style={styles.dateTimeColumn}>
+              <TouchableOpacity 
+                style={styles.dateTimeButton}
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+              </TouchableOpacity>
+              {showStartDatePicker && (
+                <DatePicker
+                  modal
+                  mode="date"
+                  open={showStartDatePicker}
+                  date={startDate}
+                  onConfirm={(date) => {
+                    setShowStartDatePicker(false);
+                    // Preserve the time from the existing startDate
+                    const newDate = new Date(date);
+                    newDate.setHours(startDate.getHours());
+                    newDate.setMinutes(startDate.getMinutes());
+                    newDate.setSeconds(startDate.getSeconds());
+                    setStartDate(newDate);
+                    
+                    // If end date is before start date, update end date
+                    if (endDate < newDate) {
+                      const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+                      setEndDate(newEndDate);
+                    }
+                  }}
+                  onCancel={() => setShowStartDatePicker(false)}
+                />
+              )}
+            </View>
+            <View style={styles.dateTimeColumn}>
+              <TouchableOpacity 
+                style={styles.dateTimeButton}
+                onPress={() => setShowStartTimePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>{formatTime(startDate)}</Text>
+                <Ionicons name="time-outline" size={20} color="#2196F3" />
+              </TouchableOpacity>
+              {showStartTimePicker && (
+                <DatePicker
+                  modal
+                  mode="time"
+                  open={showStartTimePicker}
+                  date={startDate}
+                  onConfirm={(date) => {
+                    setShowStartTimePicker(false);
+                    // Preserve the date from the existing startDate
+                    const newDate = new Date(startDate);
+                    newDate.setHours(date.getHours());
+                    newDate.setMinutes(date.getMinutes());
+                    setStartDate(newDate);
+                    
+                    // If end date is before start date, update end date
+                    if (endDate < newDate) {
+                      const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+                      setEndDate(newEndDate);
+                    }
+                  }}
+                  onCancel={() => setShowStartTimePicker(false)}
+                />
+              )}
+            </View>
+          </View>
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>End Time *</Text>
-          <TouchableOpacity 
-            style={styles.dateButton}
-            onPress={() => setShowEndDatePicker(true)}
-          >
-            <Text style={styles.dateButtonText}>{formatDate(endDate)}</Text>
-            <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-          </TouchableOpacity>
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={endDate}
-              mode="datetime"
-              display="default"
-              onChange={onEndDateChange}
-              minimumDate={startDate}
-            />
-          )}
+          <Text style={styles.label}>End Date and Time *</Text>
+          <View style={styles.dateTimeRow}>
+            <View style={styles.dateTimeColumn}>
+              <TouchableOpacity 
+                style={styles.dateTimeButton}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>{formatDate(endDate)}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+              </TouchableOpacity>
+              {showEndDatePicker && (
+                <DatePicker
+                  modal
+                  mode="date"
+                  open={showEndDatePicker}
+                  date={endDate}
+                  minimumDate={startDate}
+                  onConfirm={(date) => {
+                    setShowEndDatePicker(false);
+                    // Preserve the time from the existing endDate
+                    const newDate = new Date(date);
+                    newDate.setHours(endDate.getHours());
+                    newDate.setMinutes(endDate.getMinutes());
+                    newDate.setSeconds(endDate.getSeconds());
+                    setEndDate(newDate);
+                  }}
+                  onCancel={() => setShowEndDatePicker(false)}
+                />
+              )}
+            </View>
+            <View style={styles.dateTimeColumn}>
+              <TouchableOpacity 
+                style={styles.dateTimeButton}
+                onPress={() => setShowEndTimePicker(true)}
+              >
+                <Text style={styles.dateButtonText}>{formatTime(endDate)}</Text>
+                <Ionicons name="time-outline" size={20} color="#2196F3" />
+              </TouchableOpacity>
+              {showEndTimePicker && (
+                <DatePicker
+                  modal
+                  mode="time"
+                  open={showEndTimePicker}
+                  date={endDate}
+                  onConfirm={(date) => {
+                    setShowEndTimePicker(false);
+                    // Preserve the date from the existing endDate
+                    const newDate = new Date(endDate);
+                    newDate.setHours(date.getHours());
+                    newDate.setMinutes(date.getMinutes());
+                    setEndDate(newDate);
+                  }}
+                  onCancel={() => setShowEndTimePicker(false)}
+                />
+              )}
+            </View>
+          </View>
           {formErrors.endDate && <Text style={styles.errorText}>{formErrors.endDate}</Text>}
         </View>
 
@@ -386,6 +522,25 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 12,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dateTimeColumn: {
+    flex: 1,
+    marginRight: 8,
+  },
+  dateTimeButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 4,
   },
   dateButtonText: {
     fontSize: 16,

@@ -177,10 +177,6 @@ const TrashMap: React.FC<TrashMapProps> = ({
     router.push('/events');
   };
 
-  const navigateToCreateEvent = () => {
-    router.push('/create-event');
-  };
-
   return (
     <View style={styles.container}>
       <MapView
