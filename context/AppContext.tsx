@@ -355,7 +355,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .order('start_time', { ascending: true });
+        .gte('end_time', new Date().toISOString())
+        .order('start_time', { ascending: false });
       
       if (error) {
         throw error;

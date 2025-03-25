@@ -3,7 +3,6 @@ import {
   StyleSheet, 
   View, 
   Text, 
-  TextInput, 
   TouchableOpacity, 
   ActivityIndicator, 
   Alert,
@@ -13,22 +12,19 @@ import {
   InputAccessoryView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-//import DateTimePicker from '@react-native-community/datetimepicker';
 import { Event } from '../types';
 import { sqlFound, profanityFound } from '@/utils/text_parsing';
 import 'react-native-get-random-values';
 import GooglePlacesInput, { GooglePlacesInputRef } from './GooglePlacesInput';
-import DatePicker from 'react-native-date-picker'
-
-// print package version of react-native-date-picker to console
-
-
+import DatePicker from 'react-native-date-picker';
+import FormField from './FormField';
+import DateTimeField from './DateTimeField';
 
 interface EventFormProps {
   initialData?: Partial<Event>;
-  onSubmit: (eventData: Partial<Event>) => Promise<void>;
+  onSubmit: (data: Partial<Event>) => void;
   onCancel?: () => void;
-  submitButtonText: string;
+  submitButtonText?: string;
   isLoading?: boolean;
 }
 
@@ -39,23 +35,24 @@ const EventForm: React.FC<EventFormProps> = ({
   submitButtonText,
   isLoading = false
 }) => {
-  // Form state
   const [title, setTitle] = useState(initialData?.title || '');
-  const [description, setDescription] = useState(initialData?.description || '');
   const [location, setLocation] = useState(initialData?.location || '');
-  const [organizerName, setOrganizerName] = useState(initialData?.organizer_name || '');
+  const [latitude, setLatitude] = useState<number | undefined>(initialData?.latitude);
+  const [longitude, setLongitude] = useState<number | undefined>(initialData?.longitude);
   const [startDate, setStartDate] = useState(initialData?.start_time ? new Date(initialData.start_time) : new Date());
   const [endDate, setEndDate] = useState(initialData?.end_time ? new Date(initialData.end_time) : new Date(new Date().getTime() + 2 * 60 * 60 * 1000));
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [organizerName, setOrganizerName] = useState(initialData?.organizer_name || '');
+  const [description, setDescription] = useState(initialData?.description || '');
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  
+  // Reference to GooglePlacesInput component
+  const googlePlacesRef = useRef<GooglePlacesInputRef>(null);
 
   // Format date for display
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -65,65 +62,69 @@ const EventForm: React.FC<EventFormProps> = ({
   // Format time for display
   const formatTime = (date: Date) => {
     return date.toLocaleString('en-US', {
-      hour: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
-      hour12: true
     });
   };
 
-  // Handle date changes
-  const onStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      const newDate = new Date(startDate);
-      newDate.setFullYear(selectedDate.getFullYear());
-      newDate.setMonth(selectedDate.getMonth());
-      newDate.setDate(selectedDate.getDate());
-      setStartDate(newDate);
-      
-      // If end date is before start date, update end date
-      if (endDate < newDate) {
-        const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
-        setEndDate(newEndDate);
-      }
+  // Handle start date change
+  const handleStartDateChange = (selectedDate: Date) => {
+    // Preserve the time from the existing startDate
+    const newDate = new Date(selectedDate);
+    newDate.setHours(startDate.getHours());
+    newDate.setMinutes(startDate.getMinutes());
+    newDate.setSeconds(startDate.getSeconds());
+    setStartDate(newDate);
+    
+    // If end date is before start date, update end date
+    if (endDate < newDate) {
+      const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+      setEndDate(newEndDate);
     }
+    
+    validateField('startDate', newDate);
+    validateField('endDate', endDate);
   };
 
-  const onStartTimeChange = (event: any, selectedTime?: Date) => {
-    setShowStartTimePicker(false);
-    if (selectedTime) {
-      const newDate = new Date(startDate);
-      newDate.setHours(selectedTime.getHours());
-      newDate.setMinutes(selectedTime.getMinutes());
-      setStartDate(newDate);
-      
-      // If end date is before start date, update end date
-      if (endDate < newDate) {
-        const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
-        setEndDate(newEndDate);
-      }
+  // Handle start time change
+  const handleStartTimeChange = (selectedTime: Date) => {
+    // Preserve the date from the existing startDate
+    const newDate = new Date(startDate);
+    newDate.setHours(selectedTime.getHours());
+    newDate.setMinutes(selectedTime.getMinutes());
+    setStartDate(newDate);
+    
+    // If end date is before start date, update end date
+    if (endDate < newDate) {
+      const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
+      setEndDate(newEndDate);
     }
+    
+    validateField('startDate', newDate);
+    validateField('endDate', endDate);
   };
 
-  const onEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      const newDate = new Date(endDate);
-      newDate.setFullYear(selectedDate.getFullYear());
-      newDate.setMonth(selectedDate.getMonth());
-      newDate.setDate(selectedDate.getDate());
-      setEndDate(newDate);
-    }
+  // Handle end date change
+  const handleEndDateChange = (selectedDate: Date) => {
+    // Preserve the time from the existing endDate
+    const newDate = new Date(selectedDate);
+    newDate.setHours(endDate.getHours());
+    newDate.setMinutes(endDate.getMinutes());
+    newDate.setSeconds(endDate.getSeconds());
+    setEndDate(newDate);
+    
+    validateField('endDate', newDate);
   };
 
-  const onEndTimeChange = (event: any, selectedTime?: Date) => {
-    setShowEndTimePicker(false);
-    if (selectedTime) {
-      const newDate = new Date(endDate);
-      newDate.setHours(selectedTime.getHours());
-      newDate.setMinutes(selectedTime.getMinutes());
-      setEndDate(newDate);
-    }
+  // Handle end time change
+  const handleEndTimeChange = (selectedTime: Date) => {
+    // Preserve the date from the existing endDate
+    const newDate = new Date(endDate);
+    newDate.setHours(selectedTime.getHours());
+    newDate.setMinutes(selectedTime.getMinutes());
+    setEndDate(newDate);
+    
+    validateField('endDate', newDate);
   };
 
   // Validate a single field
@@ -173,7 +174,6 @@ const EventForm: React.FC<EventFormProps> = ({
       case 'description':
         if (value && (sqlFound(value) || profanityFound(value))) {
           errors.description = 'Invalid description detected';
-        } else {
           delete errors.description;
         }
         break;
@@ -183,57 +183,35 @@ const EventForm: React.FC<EventFormProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  // Validate form
+  // Validate all fields
   const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!title.trim()) {
-      errors.title = 'Please enter a title for the event';
-    } else if (sqlFound(title) || profanityFound(title)) {
-      errors.title = 'Invalid title detected';
-    }
-
-    if (!organizerName.trim()) {
-      errors.organizerName = 'Please enter an organizer name';
-    } else if (sqlFound(organizerName) || profanityFound(organizerName)) {
-      errors.organizerName = 'Invalid organizer name detected';
-    }
-
-    if (!location.trim()) {
-      errors.location = 'Please enter a location';
-    } else if (sqlFound(location) || profanityFound(location)) {
-      errors.location = 'Invalid location detected';
-    }
-
-    if (startDate >= endDate) {
-      errors.endDate = 'End time must be after start time';
-    }
-
-    if (description && (sqlFound(description) || profanityFound(description))) {
-      errors.description = 'Invalid description detected';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    // Validate all fields
+    const titleValid = validateField('title', title);
+    const organizerNameValid = validateField('organizerName', organizerName);
+    const locationValid = validateField('location', location);
+    const datesValid = validateField('endDate', endDate);
+    const descriptionValid = validateField('description', description);
+    
+    return titleValid && organizerNameValid && locationValid && datesValid && descriptionValid;
   };
 
   // Handle form submission
   const handleSubmit = async () => {
+    // Validate form
     if (!validateForm()) {
-      // Show first error
-      const firstError = Object.values(formErrors)[0];
-      if (firstError) {
-        Alert.alert('Error', firstError);
-      }
+      Alert.alert('Error', 'Please fix the errors in the form');
       return;
     }
-
-    setSubmitting(true);
-
+    
     try {
+      setSubmitting(true);
+      
+      // Submit form data
       await onSubmit({
         title: title.trim(),
         location: location.trim(),
+        // latitude: latitude,
+        // longitude: longitude,
         start_time: startDate.toISOString(),
         end_time: endDate.toISOString(),
         organizer_name: organizerName.trim(),
@@ -241,214 +219,86 @@ const EventForm: React.FC<EventFormProps> = ({
       });
     } catch (error: any) {
       console.error('Error submitting event form:', error);
-      Alert.alert('Error', error.message || 'Failed to submit form. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to submit event');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Create ref for GooglePlacesInput
-  const googlePlacesRef = useRef<GooglePlacesInputRef>(null);
-
   return (
     <KeyboardAvoidingView
       style={styles.formContainer}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      //keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
     >
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
       >
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Event Title *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter event title"
-            value={title}
-            onChangeText={(text) => {
-              setTitle(text);
-              validateField('title', text);
-            }}
-          />
-          {formErrors.title && <Text style={styles.errorText}>{formErrors.title}</Text>}
-        </View>
+        <FormField
+          label="Event Title *"
+          placeholder="Enter event title"
+          value={title}
+          onChangeText={(text) => {
+            setTitle(text);
+            validateField('title', text);
+          }}
+          error={formErrors.title}
+        />
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Organizer Name *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter organizer name"
-            value={organizerName}
-            onChangeText={(text) => {
-              setOrganizerName(text);
-              validateField('organizerName', text);
-            }}
-          />
-          {formErrors.organizerName && <Text style={styles.errorText}>{formErrors.organizerName}</Text>}
-        </View>
+        <FormField
+          label="Organizer Name *"
+          placeholder="Enter organizer name"
+          value={organizerName}
+          onChangeText={(text) => {
+            setOrganizerName(text);
+            validateField('organizerName', text);
+          }}
+          error={formErrors.organizerName}
+        />
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Location *</Text>
           <GooglePlacesInput
             ref={googlePlacesRef}
             initialValue={location}
-            onPlaceSelect={(address) => {
+            onPlaceSelect={(address, lat, lng) => {
               setLocation(address);
+              setLatitude(lat);
+              setLongitude(lng);
               validateField('location', address);
             }}
           />
           {formErrors.location && <Text style={styles.errorText}>{formErrors.location}</Text>}
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Start Date and Time *</Text>
-          <View style={styles.dateTimeRow}>
-            <View style={styles.dateTimeColumn}>
-              <TouchableOpacity 
-                style={styles.dateTimeButton}
-                onPress={() => setShowStartDatePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-              </TouchableOpacity>
-              {showStartDatePicker && (
-                <DatePicker
-                  modal
-                  mode="date"
-                  open={showStartDatePicker}
-                  date={startDate}
-                  onConfirm={(date) => {
-                    setShowStartDatePicker(false);
-                    // Preserve the time from the existing startDate
-                    const newDate = new Date(date);
-                    newDate.setHours(startDate.getHours());
-                    newDate.setMinutes(startDate.getMinutes());
-                    newDate.setSeconds(startDate.getSeconds());
-                    setStartDate(newDate);
-                    
-                    // If end date is before start date, update end date
-                    if (endDate < newDate) {
-                      const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
-                      setEndDate(newEndDate);
-                    }
-                  }}
-                  onCancel={() => setShowStartDatePicker(false)}
-                />
-              )}
-            </View>
-            <View style={styles.dateTimeColumn}>
-              <TouchableOpacity 
-                style={styles.dateTimeButton}
-                onPress={() => setShowStartTimePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{formatTime(startDate)}</Text>
-                <Ionicons name="time-outline" size={20} color="#2196F3" />
-              </TouchableOpacity>
-              {showStartTimePicker && (
-                <DatePicker
-                  modal
-                  mode="time"
-                  open={showStartTimePicker}
-                  date={startDate}
-                  onConfirm={(date) => {
-                    setShowStartTimePicker(false);
-                    // Preserve the date from the existing startDate
-                    const newDate = new Date(startDate);
-                    newDate.setHours(date.getHours());
-                    newDate.setMinutes(date.getMinutes());
-                    setStartDate(newDate);
-                    
-                    // If end date is before start date, update end date
-                    if (endDate < newDate) {
-                      const newEndDate = new Date(newDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours after start
-                      setEndDate(newEndDate);
-                    }
-                  }}
-                  onCancel={() => setShowStartTimePicker(false)}
-                />
-              )}
-            </View>
-          </View>
-        </View>
+        <DateTimeField
+          label="Start Date and Time *"
+          date={startDate}
+          onDateChange={handleStartDateChange}
+          onTimeChange={handleStartTimeChange}
+        />
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>End Date and Time *</Text>
-          <View style={styles.dateTimeRow}>
-            <View style={styles.dateTimeColumn}>
-              <TouchableOpacity 
-                style={styles.dateTimeButton}
-                onPress={() => setShowEndDatePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{formatDate(endDate)}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#2196F3" />
-              </TouchableOpacity>
-              {showEndDatePicker && (
-                <DatePicker
-                  modal
-                  mode="date"
-                  open={showEndDatePicker}
-                  date={endDate}
-                  minimumDate={startDate}
-                  onConfirm={(date) => {
-                    setShowEndDatePicker(false);
-                    // Preserve the time from the existing endDate
-                    const newDate = new Date(date);
-                    newDate.setHours(endDate.getHours());
-                    newDate.setMinutes(endDate.getMinutes());
-                    newDate.setSeconds(endDate.getSeconds());
-                    setEndDate(newDate);
-                  }}
-                  onCancel={() => setShowEndDatePicker(false)}
-                />
-              )}
-            </View>
-            <View style={styles.dateTimeColumn}>
-              <TouchableOpacity 
-                style={styles.dateTimeButton}
-                onPress={() => setShowEndTimePicker(true)}
-              >
-                <Text style={styles.dateButtonText}>{formatTime(endDate)}</Text>
-                <Ionicons name="time-outline" size={20} color="#2196F3" />
-              </TouchableOpacity>
-              {showEndTimePicker && (
-                <DatePicker
-                  modal
-                  mode="time"
-                  open={showEndTimePicker}
-                  date={endDate}
-                  onConfirm={(date) => {
-                    setShowEndTimePicker(false);
-                    // Preserve the date from the existing endDate
-                    const newDate = new Date(endDate);
-                    newDate.setHours(date.getHours());
-                    newDate.setMinutes(date.getMinutes());
-                    setEndDate(newDate);
-                  }}
-                  onCancel={() => setShowEndTimePicker(false)}
-                />
-              )}
-            </View>
-          </View>
-          {formErrors.endDate && <Text style={styles.errorText}>{formErrors.endDate}</Text>}
-        </View>
+        <DateTimeField
+          label="End Date and Time *"
+          date={endDate}
+          onDateChange={handleEndDateChange}
+          onTimeChange={handleEndTimeChange}
+          error={formErrors.endDate}
+          minDate={startDate}
+        />
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Description (Optional)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Enter event description, details, what to bring, etc."
-            value={description}
-            onChangeText={(text) => {
-              setDescription(text);
-              validateField('description', text);
-            }}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-          {formErrors.description && <Text style={styles.errorText}>{formErrors.description}</Text>}
-        </View>
+        <FormField
+          label="Description (Optional)"
+          placeholder="Enter event description, details, what to bring, etc."
+          value={description}
+          onChangeText={(text) => {
+            setDescription(text);
+            validateField('description', text);
+          }}
+          multiline={true}
+          numberOfLines={4}
+          error={formErrors.description}
+        />
         
         <View style={styles.buttonRow}>
           {onCancel && (
@@ -469,7 +319,7 @@ const EventForm: React.FC<EventFormProps> = ({
             {(submitting || isLoading) ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>{submitButtonText}</Text>
+              <Text style={styles.buttonText}>{submitButtonText || 'Submit'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -485,15 +335,14 @@ const EventForm: React.FC<EventFormProps> = ({
 const styles = StyleSheet.create({
   formContainer: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   scrollContent: {
-    paddingVertical: 16,
+    padding: 16,
+    paddingBottom: 40,
   },
   inputContainer: {
-    marginTop: 20,
-    marginBottom: 5,
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
@@ -502,26 +351,16 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   input: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: '#333',
   },
   textArea: {
     minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  dateButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -535,53 +374,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    marginHorizontal: 4,
   },
   dateButtonText: {
     fontSize: 16,
     color: '#333',
   },
+  errorText: {
+    color: '#F44336',
+    marginTop: 4,
+    fontSize: 14,
+  },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 24,
+    marginBottom: 16,
   },
   button: {
     borderRadius: 8,
-    paddingVertical: 14,
+    padding: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 50,
+  },
+  cancelButton: {
+    backgroundColor: '#9E9E9E',
+    marginRight: 8,
+    flex: 1,
   },
   submitButton: {
     backgroundColor: '#4CAF50',
     flex: 2,
   },
-  cancelButton: {
-    backgroundColor: '#f44336',
-    marginRight: 12,
-    flex: 1,
-  },
   buttonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   noteText: {
-    marginTop: 16,
-    fontSize: 14,
     color: '#666',
+    fontSize: 14,
     textAlign: 'center',
   },
-  errorText: {
-    color: '#f44336',
-    fontSize: 14,
-    marginTop: 4,
-  }
 });
 
 export default EventForm;

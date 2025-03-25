@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, View, Dimensions, ScrollView } from 'react-native';
+import { StyleSheet, View, Dimensions } from 'react-native';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 interface GooglePlacesInputProps {
   placeholder?: string;
   initialValue?: string;
-  onPlaceSelect: (address: string) => void;
+  onPlaceSelect: (address: string, latitude?: number, longitude?: number) => void;
 }
 
 export interface GooglePlacesInputRef {
@@ -34,44 +34,42 @@ const GooglePlacesInput = forwardRef<GooglePlacesInputRef, GooglePlacesInputProp
 
     return (
       <View style={styles.container}>
-<ScrollView
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ flexGrow: 1 }}
-    >
-          <GooglePlacesAutocomplete
-            ref={googlePlacesRef}
-            placeholder={placeholder}
-            fetchDetails={true}
-            disableScroll={true}
-            onPress={(data, details = null) => {
-              onPlaceSelect(data.description);
-            }}
-            query={{
-              key: process.env.EXPO_GOOGLE_MAPS_API_KEY,
-              language: 'en',
-            }}
-            styles={{
-              container: styles.autocompleteContainer,
-              textInputContainer: styles.textInputContainer,
-              textInput: styles.textInput,
-              listView: styles.listView,
-              row: styles.row,
-              separator: styles.separator,
-              description: styles.description,
-              predefinedPlacesDescription: styles.predefinedPlacesDescription,
-            }}
-            enablePoweredByContainer={false}
-            textInputProps={{
-              autoCapitalize: 'none',
-              autoCorrect: false,
-            }}
-            listViewDisplayed="auto"
-            minLength={2}
-            nearbyPlacesAPI="GooglePlacesSearch"
-            debounce={300}
-            keyboardShouldPersistTaps="handled"
-          />
-        </ScrollView>
+        <GooglePlacesAutocomplete
+          ref={googlePlacesRef}
+          placeholder={placeholder}
+          fetchDetails={true}
+          disableScroll={true}
+          onPress={(data, details = null) => {
+            onPlaceSelect(data.description);
+          }}
+          query={{
+            key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+            language: 'en',
+          }}
+          textInputProps={{
+            autoCapitalize: 'none',
+            autoCorrect: false,
+            onChangeText: (text) => {
+              console.log('Input text changed:', text);
+            },
+          }}
+          styles={{
+            container: styles.autocompleteContainer,
+            textInputContainer: styles.textInputContainer,
+            textInput: styles.textInput,
+            listView: styles.listView,
+            row: styles.row,
+            separator: styles.separator,
+            description: styles.description,
+            predefinedPlacesDescription: styles.predefinedPlacesDescription,
+          }}
+          enablePoweredByContainer={false}
+          listViewDisplayed="auto"
+          minLength={2}
+          nearbyPlacesAPI="GooglePlacesSearch"
+          debounce={300}
+          keyboardShouldPersistTaps="always"
+        />
       </View>
     );
   }
@@ -81,18 +79,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 0,
     position: 'relative',
-    // zIndex: 9999,
-    // elevation: 9999,
-    //height: 200, // Fixed height for the container
-  },
-  scrollView: {
-    flex: 1,
+    zIndex: 10000,
+    elevation: 10000,
   },
   autocompleteContainer: {
     flex: 0,
     width: '100%',
-    // zIndex: 9999,
-    // elevation: 9999,
+    zIndex: 10000,
+    elevation: 10000,
   },
   textInputContainer: {
     width: '100%',
@@ -111,8 +105,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
-    // zIndex: 9999,
-    // elevation: 9999,
+    zIndex: 10000,
+    elevation: 10000,
+    position: 'absolute',
+    width: '100%',
+    top: 50,
   },
   row: {
     padding: 13,

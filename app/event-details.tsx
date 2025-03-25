@@ -7,7 +7,8 @@ import {
   ActivityIndicator, 
   Alert, 
   ScrollView,
-  Platform
+  Platform,
+  Linking
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -162,6 +163,34 @@ export default function EventDetailsScreen() {
     });
   };
 
+  const openMaps = (location: string) => {
+    if (!location) {
+      Alert.alert('Error', 'Location address not available');
+      return;
+    }
+
+    const encodedLocation = encodeURIComponent(location);
+    
+    let url;
+    if (Platform.OS === 'ios') {
+      url = `maps:?q=${encodedLocation}`;
+    } else {
+      url = `geo:0,0?q=${encodedLocation}`;
+    }
+
+    Linking.canOpenURL(url).then(supported => {
+      if (supported) {
+        return Linking.openURL(url);
+      } else {
+        const browser_url = `https://www.google.com/maps/search/?api=1&query=${encodedLocation}`;
+        return Linking.openURL(browser_url);
+      }
+    }).catch(err => {
+      console.error('An error occurred', err);
+      Alert.alert('Error', 'Could not open map application');
+    });
+  };
+
   const getEventStatus = (event: Event) => {
     if (!event) return '';
     
@@ -247,7 +276,7 @@ export default function EventDetailsScreen() {
         }}
       />
       
-      <ScrollView style={styles.container}>
+      <View style={styles.container}>
         {editMode ? (
           // Edit Mode Form
           <EventForm
@@ -282,10 +311,14 @@ export default function EventDetailsScreen() {
                 </Text>
               </View>
               
-              <View style={styles.infoRow}>
+              <TouchableOpacity 
+                style={styles.infoRow}
+                onPress={() => openMaps(event.location)}
+              >
                 <Ionicons name="location-outline" size={20} color="#666" style={styles.infoIcon} />
-                <Text style={styles.infoText}>{event.location}</Text>
-              </View>
+                <Text style={[styles.infoText, styles.linkText]}>{event.location}</Text>
+                <Ionicons name="navigate-outline" size={16} color="#4CAF50" style={{marginLeft: 5}} />
+              </TouchableOpacity>
               
               <View style={styles.infoRow}>
                 <Ionicons name="person-outline" size={20} color="#666" style={styles.infoIcon} />
@@ -330,7 +363,7 @@ export default function EventDetailsScreen() {
             )}
           </View>
         )}
-      </ScrollView>
+      </View>
     </>
   );
 }
@@ -426,6 +459,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     flex: 1,
+  },
+  linkText: {
+    color: '#2196F3',
+    textDecorationLine: 'underline',
   },
   descriptionSection: {
     backgroundColor: 'white',

@@ -103,29 +103,23 @@ export default function CreateEventScreen() {
   };
 
   return (
-    <View 
-      // style={styles.container}
-      // behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      // keyboardVerticalOffset={100}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Create Trash Pickup Event</Text>
-          <View style={styles.emptySpace} />
-        </View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Create Trash Pickup Event</Text>
+        <View style={styles.emptySpace} />
+      </View>
 
-        <EventForm
-          onSubmit={handleSubmit}
-          submitButtonText="Create Event"
-          isLoading={loading}
-        />
-      </ScrollView>
+      <EventForm
+        onSubmit={handleSubmit}
+        submitButtonText="Create Event"
+        isLoading={loading}
+      />
     </View>
   );
 }
@@ -134,10 +128,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
